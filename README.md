@@ -514,13 +514,13 @@ function gatherEth() external {
 }
 ```
 
-※4 コントラクトを削除する関数
+* 4 Function that deletes a contract
 
-**changeColdAddress関数**
-コールドアドレスを新しいアドレスに変更することが出来ます。その際に条件として以下である必要があります。
-①実行する文脈がExchangeDeposit
-②強制終了されていない
-③adminAddressである
+** changeColdAddress function **
+You can change the cold address to a new address. At that time, the conditions must be as follows.
+① The execution context is Exchange Deposit
+② Not forcibly terminated
+③ adminAddress
 
 ```javascript
 function changeColdAddress(address payable newAddress)
@@ -534,9 +534,9 @@ function changeColdAddress(address payable newAddress)
 }
 ```
 
-**changeImplAddress関数**
+** changeImplAddress function **
 
-implementationアドレスを新しいアドレスに変更することが出来ます。条件はchangeColdAddress関数と同様です。変更するアドレスは0アドレス(ない状態に戻せる様にする為)もしくはコントラクトアドレスである必要があります。
+You can change the implementation address to a new address. The conditions are the same as for the changeColdAddress function. The address to be changed must be a 0 address (so that it can be returned to the non-existent state) or a contract address.
 
 ```javascript
 function changeImplAddress(address payable newAddress)
@@ -554,9 +554,9 @@ function changeImplAddress(address payable newAddress)
 ```
 
 
-**changeMinInput関数**
+** changeMinInput function **
 
-最低入金額を変更することが出来ます。条件はchangeColdAddress関数と同様です。
+You can change the minimum deposit amount. The conditions are the same as for the changeColdAddress function.
 
 ```javascript
 function changeMinInput(uint256 newMinInput)
@@ -568,9 +568,10 @@ function changeMinInput(uint256 newMinInput)
     minimumInput = newMinInput;
 }
 ```
-**kill関数**
 
-コールドアドレスを0アドレスにして、コントラクトを強制終了します。
+** kill function **
+
+Set the cold address to 0 and kill the contract.
 
 ```javascript
 function kill() external onlyExchangeDepositor onlyAlive onlyAdmin {
@@ -578,10 +579,10 @@ function kill() external onlyExchangeDepositor onlyAlive onlyAdmin {
 }
 ```
 
-### receiveとfallback
-**receive関数**
+### receive and fallback
+** receive function **
 
-receive関数はfallback関数に似ていますが、calldataがない取引にてETHが送金された場合に呼び出されます。receive関数がない場合はfallback関数が呼ばれます。
+The receive function is similar to the fallback function, but is called when ETH is sent in a transaction without call data. If there is no receive function, the fallback function will be called.
 
 ```javascript
 receive() external payable {
@@ -593,14 +594,14 @@ receive() external payable {
 }
 ```
 
-コールドアドレスがkillされていないか、最低入金金額を下回っていないかをチェックします。
+Check if the cold address has been killed and is not below the minimum deposit amount.
 
 ```javascript
 require(coldAddress != address(0), 'I am dead :-(');
 require(msg.value >= minimumInput, 'Amount too small');
 ```
 
-コールドアドレスにETHを転送します。`emit`は`event`で記録したトランザクションのログを出力する際に使用します。資金の送り元のアドレスとその金額を指定して出力しています。
+Forwards ETH to the cold address. `emit` is used to output the transaction log recorded in` event`. The address of the source of funds and the amount of money are specified and output.
 
 ```javascript
 (bool success, ) = coldAddress.call{ value: msg.value }('');
@@ -608,9 +609,9 @@ require(success, 'Forwarding funds failed');
 emit Deposit(msg.sender, msg.value);
 ```
 
-**fallback関数**
+** fallback function **
 
-ExchangeDepositコントラクトにない関数を呼ばれた場合に、このfallback関数が実行されます。
+This fallback function is executed when a function that is not in the ExchangeDeposit contract is called.
 
 ```javascript
 fallback() external payable onlyAlive {
@@ -621,7 +622,7 @@ fallback() external payable onlyAlive {
 }
 ```
 
-ImplAddress(ロジックコントラクトのアドレス)を取得しそのアドレスに対してdelegatecallでmsg.dataをcalldataとして呼び出します。
+Get the ImplAddress (address of the logic contract) and call msg.data as call data with a delegate call to that address.
 
 ```javascript
 address payable toAddr = getImplAddress();
@@ -629,126 +630,125 @@ address payable toAddr = getImplAddress();
 ```
 
 ## Payment confirmation of ExchangeDepositContract
-最後に入金の流れを確認する為、テストネットワーク上で入金アドレスにETHとERC20のトークンを入金し、コールドアドレスに届く過程を確認してみたいと思います。
+Finally, in order to check the deposit flow, I would like to confirm the process of depositing ETH and ERC20 tokens to the deposit address on the test network and reaching the cold address.
 
-### 環境
-MetaMask 8.1.9
-solidity version 0.6.11
-Remix
-Etherscan
+### Environment
+MetaMask: 8.1.9
+solidity: 0.6.11
+Remix:
+Etherscan:
 
-### ETHの入金
-①MetaMaskとRemixの連携
+### Deposit ETH
+① Cooperation between MetaMask and Remix
 
-Remixの`ENVIRONMENT`を`Injected Web3`に変更します。MetaMaskにログインし`Ropstenテストネット`を選択して連携を行います。
+Change the Remix `ENVIRONMENT` to` Injected Web 3`. Log in to MetaMask and select `Ropsten Testnet` to work together.
 
 ![スクリーンショット 2021-01-03 22.21.06.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/b05f3f34-4e59-d5e8-15f9-776c2e56e795.png)
 
-②MetaMaskの設定
+②MetaMask settings
 
-MetaMaskでAdminAccount, ColdAccount, TransferAccountを作成します。AdminAccountとTransferAccountにFaucetからETHを入金しておきます。
+Create AdminAccount, ColdAccount, TransferAccount in MetaMask. Deposit ETH from Faucet to Admin Account and Transfer Account.
 
 ![スクリーンショット 2021-01-03 22.44.26.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/8ec971a6-92f4-bf0a-2ee0-a443b22fccc2.png)
 
-③Remixの設定
+③ Remix settings
 
-ExchangeDepositContractとProxyFactoryContractを１つのファイルにまとめてコンパイルします。
+Compile ExchangeDepositContract and ProxyFactoryContract together in one file.
 
 
-④ExchangeDepositContractをデプロイ
+④ Deploy Exchange Deposit Contract
 
-- AdminAccountでExchange Deposit Contractをデプロイします。ContractをExchangeDepositに設定して下さい
-- 引数に`cold address(ColdAccountのアドレス)`と`admin address(AdminAccountのアドレス)`を指定して`transact`を押下します
-- MetaMaskのウィンドウが開きますので`確認`を押下します
+--Deploy Exchange Deposit Contract with Admin Account. Set Contract to Exchange Deposit
+--Specify `cold address (Cold Account address)` and `admin address (Admin Account address)` as arguments and press `transact`.
+--The MetaMask window will open, so press `Confirm`.
 
 ![スクリーンショット 2021-01-04 7.44.25.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/d0fc6306-c862-bc33-dd19-be539239699e.png)
 
-⑤ProxyFactoryContractをデプロイ
+⑤ Deploy ProxyFactory Contract
 
-- AdminAccountでProxyFactoryContractをデプロイします。ContractをProxyFactoryContractに設定して下さい
-- 引数に④でデプロイしたExchangeDepositContractのコントラクトアドレスを指定して`transact`を押下します
-- MetaMaskのウィンドウが開きますので`確認`ボタンを押します
+--Deploy ProxyFactoryContract with AdminAccount. Set Contract to ProxyFactoryContract
+--Specify the contract address of ExchangeDepositContract deployed in ④ as an argument and press `transact`.
+--The MetaMask window will open, so press the `Confirm` button.
 
 ![スクリーンショット 2021-01-04 7.44.25.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/7767f0f9-86eb-2d3b-239a-8563ad3c78d4.png)
 
-⑥deployNewInstanceの作成
+⑥ Create deployNewInstance
 
-- ⑤でデプロイしたProxyFactoryContractのdeployNewInstance関数を実行します
-- 引数に32byteのsaltを指定します(16進数32byteであればなんでもOK)
+--Execute the deployNewInstance function of ProxyFactoryContract deployed in ⑤
+--Specify a 32-byte salt as an argument (any 32-byte hexadecimal number is OK)
 
 ```
-例：
+Example：
 0x0000000000000000000000AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA00
 ```
 
 ![スクリーンショット 2021-01-04 8.07.55.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/8429d8b7-1da3-4ddb-d9eb-92b6dbc32e12.png)
 
-⑦deployNewInstanceのアドレスを確認
+⑦Check the address of deployNewInstance
 
-deployNewInstanceの詳細を確認する為にEtherscanのURLをクリックします
+Click the Etherscan URL to see the details of deployNewInstance
 
-赤で囲った部分がdeployNewInstanceのアドレスになります
+The part surrounded by red is the address of deployNewInstance
 
 ![スクリーンショット 2021-01-04 8.13.18.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/544d1bf3-a83f-fa4a-8dd7-3dbec003d035.png)
 
 
-⑧入金用のアドレスへ送金
+⑧ Remittance to the deposit address
 
-MetaMaskを使って実際にユーザ毎に割り当てられる入金用のアドレス(deployNewInstanceのコントラクトアドレス)に対して、ユーザーのアカウント(TransferAccount)から0.5ETH送金してみます。
+Try sending 0.5 ETH from the user's account (Transfer Account) to the deposit address (deployNewInstance contract address) that is actually assigned to each user using MetaMask.
 
 
-⑨入金の確認
+⑨ Confirmation of payment
 
-ユーザーのアカウント(Transfer Address)から0.5ETHをユーザーの入金用アドレス(deployNewInstanceAddress)に送金した金額がコールドアドレス(ColdAddress)に届いているのが確認出来ました。
+It was confirmed that the amount of 0.5 ETH sent from the user's account (Transfer Address) to the user's deposit address (deploy New Instance Address) has arrived at the cold address (Cold Address).
 
 ![スクリーンショット 2021-01-04 8.52.34.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/9d4b5db0-21c2-4212-04b7-12b6a2cfc20b.png)
 
-### ERC20トークンの入金
+### Deposit ERC20 Token
 
-それではMetaMaskとRemixを使って入金します上記`ETHの入金`の工程⑦までは同じ作業になります。
+Then, make a deposit using MetaMask and Remix. The procedure up to the above `ETH deposit` step ⑦ is the same.
 
-①SimpleCoinContractをデプロイ
+① Deploy SimpleCoinContract
 
 ![スクリーンショット 2021-01-04 22.23.37.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/2dbd2eac-1e45-7f1e-c008-4ad8b96a5b7a.png)
 
 
-②送金の準備
-SimpleCoinContractのgiveBalance関数でTransferAccountにトークンを送ります。
+② Preparation for remittance
+Send a token to TransferAccount with the giveBalance function of SimpleCoinContract.
+
 ![スクリーンショット 2021-01-04 22.24.31.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/a06de716-d668-f800-b316-d20b152f8a15.png)
 
 
-③入金用のアドレスへ送金
+③ Send money to the deposit address
 
-TransferAccountから入金用のアドレスにトークンを送金します。
+Transfer the token from the Transfer Account to the deposit address.
 
-④トークンのTransferイベント履歴を調べる
+④ Check the token Transfer event history
 
-トークンのコントラクトアドレスでTransferイベント履歴を参照すると入金アドレスに入金があったことが確認できます。
+If you refer to the Transfer event history with the contract address of the token, you can confirm that there was a deposit at the deposit address.
 
 ![スクリーンショット 2021-01-04 22.53.50.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/e973b106-cefc-17d7-c750-e8c9cffce81b.png)
 
 
-⑤ExchangeDepositContractをインスタンス化
-- ERC20トークンは自動でコールアドレスに送金されないので、入金アドレスからコールドアドレスに送金する操作が必要になります
-- 入金用のアドレスでExchangeDepositContractをインスタンス化(At Addressの欄に入金アドレスを入力し押下)します
+⑤ Instantiate Exchange Deposit Contract
+--The ERC20 token is not automatically sent to the call address, so you need to send money from the deposit address to the cold address.
+--Instantiate Exchange Deposit Contract with the deposit address (enter the deposit address in the At Address field and press it)
 
 ![スクリーンショット 2021-01-04 22.58.42.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/f37711d4-049e-98dd-3c4c-bf53ae1b11b7.png)
 
+⑥ Remittance to cold address
 
-
-⑥コールドアドレスへの送金
-
-入金用アドレスでインスタンス化したExchangeDepositContractのgatherErc20関数を使ってコールドアドレスへの送金を行います。gatherErc20関数の引数にはトークンのコントラクトアドレスを指定します。
+Use the gatherErc20 function of ExchangeDepositContract instantiated with the deposit address to send money to the cold address. Specify the contract address of the token in the argument of the gatherErc20 function.
 
 ![スクリーンショット 2021-01-04 23.00.33.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/25794233-514e-63bd-9445-3dd606f82369.png)
 
-⑦入金の確認
+⑦ Confirmation of payment
 
-Transfer Addressからユーザーの入金用アドレスに送金した金額がコールドアドレスに届いているのが確認出来ました。
+I was able to confirm that the amount sent from the Transfer Address to the user's deposit address has arrived at the cold address.
 
 ![スクリーンショット 2021-01-04 23.02.43.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/e0e79a3f-e658-65bd-e739-6c3d13936fc1.png)
 
-## 参考文献
+## References
 - [Ethereum Whitepaper](https://ethereum.org/en/whitepaper/)
 - [Ethereum yellow paper](https://ethereum.github.io/yellowpaper/paper.pdf) 
 - [Ethereum Virtual Machine Opcodes](https://ethervm.io/)
