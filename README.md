@@ -42,24 +42,24 @@ The deposit destination of ETH and ERC20 is the same contract address, but the f
 
 ![スクリーンショット 2021-01-03 14.48.24.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/03be5727-eccf-756a-c37a-981e32a81985.png)
 
-## ExchangeDepositContractの説明
-それではここからは入金システムの具体的な説明に移りたいと思います。
-[Exchange Deposit Contract](https://github.com/bitbankinc/exchangeDepositContract)には５つのsolidityファイルがあります。入金検知システムに直接関わるのは①と②で③〜⑤はテストのためのコントラクトになります。
+## Details of ExchangeDepositContract
+
+[Exchange Deposit Contract](https://github.com/bitbankinc/exchangeDepositContract) has 5 solidity files. ① and ② are directly related to the deposit detection system, and ③ to ⑤ are test contracts.
 
 ①ExchangeDeposit
-メインのコントラクトになります。このコントラクトは、はじめに1度だけデプロイされます。
+It will be the main contract. This contract is deployed only once at the beginning.
 
 ②ProxyFactory
-ユーザーごとにForwarding Contractを作成するコントラクトになります。ユーザーはForwarding Contractのコントラクトアドレスに対して入金を行います。
+It is a contract that creates a Forwarding Contract for each user. The user makes a deposit to the Forwarding Contract contract address.
 
-③【テスト用】SimpleCoin
-ERC20を模擬したコントラクトになります。このコントラクトはERC20のテストする際に使用します。
+③【Test】SimpleCoin
+It is a contract that imitates ERC20. This contract is used when testing ERC20.
 
-④【テスト用】SimpleBadCoin
-ERC20を模擬したコントラクトになります。SimpleCoinの悪い事例をテストする際に使用します。
+④【Test】SimpleBadCoin
+It is a contract that imitates ERC20. Used when testing bad cases of SimpleCoin.
 
-⑤【テスト用】SampleLogic
-プロキシコントラクトから新しいロジックのコントラクトを指定した際にどの様に機能するのか模擬したコントラクトです。テストする際に使用します。
+⑤【Test】SampleLogic
+It is a contract that simulates how it works when a new logic contract is specified from a proxy contract. Used when testing.
 
 
 ## Proxy Factory Contract
@@ -101,59 +101,60 @@ contract ProxyFactory {
     }
 }
 ```
-Forwarding Contractをバイトコードで`INIT_CODE`に書き込んでいます。
+It is writing the Forwarding Contract in bytecode to `INIT_CODE`.
 
 ```javascript
 bytes private constant INIT_CODE = hex'604080600a3d393df3fe7300000000000000000000000000000000000000003d366025573d3d3d3d34865af16031565b363d3d373d3d363d855af45b3d82803e603c573d81fd5b3d81f3';
 ```
-具体的には下記のバイトコードです。
+
+The bytecode below.
 
 ```
 0x604080600a3d393df3fe7300000000000000000000000000000000000000003d366025573d3d3d3d34865af16031565b363d3d373d3d363d855af45b3d82803e603c573d81fd5b3d81f3
 ```
 
-`bytes memory`でメモリにバイトコードを書き込んでいます。`initCodeMem`には`INIT_CODE`のバイト長が含まれます。
+I am writing bytecode to memory with `bytes memory`. `initCodeMem` contains the byte length of` INIT_CODE`.
 
 ```
 bytes memory initCodeMem = INIT_CODE;
 ```
 
-`let pos := add(initCodeMem, 0x20)`はForwarding Contractのバイトコードの先頭を指しています。
+`let pos: = add (initCodeMem, 0x20)` points to the beginning of the Forwarding Contract bytecode.
 
 ```javascript
 let pos := add(initCodeMem, 0x20)
 let first32 := mload(pos)
 ```
 
-`first32`にはForwarding Contractの先頭の32byteが格納されます。
+The first 32 bytes of the Forwarding Contract are stored in `first32`.
 
 ```
 604080600a3d393df3fe7300000000000000000000000000000000000000003d
 ```
 
-ここでaddrStack(アドレス)を8bit左にシフトします。
+Now shift the addrStack (address) 8 bits to the left.
 
 ```javascript
 let addrBytesShifted := shl(8, addrStack)
 ```
 
-00を前から取り除き、後ろにくっつけます
+Remove 00 from the front and stick it to the back
 
 ```
-シフト前：
+Before shift：
 000000000000000000000000AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 
-シフト後：
+After shift：
 0000000000000000000000AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA00
 ```
 
-シフトしたアドレスとメモリから読み込んだForwarding Contractの先頭の32byteを`or`します。
+`or` the first 32 bytes of the Forwarding Contract read from the shifted address and memory.
 
 ```javascript
 mstore(pos, or(first32, addrBytesShifted))
 ```
 
-`FF`に`60408060...`を、`00`に`AA`を上書きすることで、バイトコードを整形しています。
+The bytecode is formatted by overwriting `60408060 ...` in `FF` and` AA` in `00`.
 
 ```
 60 40 80 60 0a 3d 39 3d f3 fe 73 0000000000000000000000000000000000000000 3d
@@ -161,24 +162,25 @@ or
 00 00 00 00 00 00 00 00 00 00 00 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 00
 ```
 
-整形した結果は以下の通りになります。
+The formatted result is as follows.
 
 ```
 60 40 80 60 0a 3d 39 3d f3 fe 73 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 3d
 ```
 
 ## Forwarding Contract
-Proxy Factory ContractのdeployNewInstanceに定義されている下記のバイトコードがForwarding Contractになります。
+The following bytecode defined in deployNewInstance of Proxy Factory Contract is Forwarding Contract.
 
 ```
 60 40 80 60 0a 3d 39 3d f3 fe 73 AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA 3d 36 60 25 57 3d 3d 3d 3d 34 86 5a f1 60 31 56 5b 36 3d 3d 37 3d 3d 36 3d 85 5a f4 5b 3d 82 80 3e 60 3c 57 3d 81 fd 5b 3d 81 f3
 ```
 
-Forwarding Contractがどの様な処理を行っているのか説明したいと思います。その際にPOS(ポジション)、OPCODE(オペコード)、OPCODE TEXT(オペコードの内容)、STACK(スタック)の状態を表した図を使用します(※3)。
+I would like to explain what the Forwarding Contract is doing. At that time, a diagram showing the status of POS (position), OPCODE (opcode), OPCODE TEXT (content of opcode), and STACK (stack) is used (* 3).
 
-※3 OPCODEについては [Ethereum Virtual Machine Opcodes](https://ethervm.io/)をご参照して下さい
-### Forwarding Contractのデプロイコード
-この部分は実行コードをデプロイする為のデプロイコードになります。
+※3 Please refer to [Ethereum Virtual Machine Opcodes] (https://ethervm.io/) for OPCODE.
+
+### Forwarding Contract deployment code
+This part is the deployment code for deploying the executable code.
 
 ```
 60 40 80 60 0a 3d 39 3d f3 fe 
@@ -186,11 +188,11 @@ Forwarding Contractがどの様な処理を行っているのか説明したい�
 
 - POS 00〜06
 
-メモリの0x0領域にPOSの0a〜3F(実行コード)の0x40(64byte)をコピーしています。
+0x40 (64 bytes) of POS 0a to 3F (execution code) is copied to the 0x0 area of the memory.
 
 - POS 09
 
-OPCODEの`fe`は`INVALID`を表しデプロイコードと実行コードの境目を意味します。
+The OPCODE `fe` stands for` INVALID` and means the boundary between the deploy code and the execution code.
 
 | POS | OPCODE | OPCODE TEXT | STACK |
 | --- | --- | --- | --- |
@@ -204,7 +206,7 @@ OPCODEの`fe`は`INVALID`を表しデプロイコードと実行コードの境�
 | 09 | fe | INVALID |  |
 
 ### Forwarding Contractの実行コード
-この部分ではcalldataの長さが0かどうかで分岐を行っています。
+In this part, branching is performed depending on whether the length of call data is 0.
 
 ```
 73 AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA 3d 36 60 25 57
@@ -212,8 +214,7 @@ OPCODEの`fe`は`INVALID`を表しデプロイコードと実行コードの境�
 
 - POS 00〜19
 
-calldataの長さが0だった場合はジャンプせずに引き続きPOS 1Aのバイトコードを実行します。calldataの長さが0以外の場合はPOS 25にジャンプします。
-
+If the length of calldata is 0, POS 1A bytecode is continued without jumping. Jumps to POS 25 if the calldata length is non-zero.
 
 | POS | OPCODE | OPECODE TEXT | STACK |
 | --- | --- | --- | --- |
@@ -223,8 +224,8 @@ calldataの長さが0だった場合はジャンプせずに引き続きPOS 1A�
 | 17 | 6025 | PUSH1 0x25 | 0x25 CDS 0x0 {ADDR} |
 | 19 | 57 | JUMPI | 0x0 {ADDR} |
 
-### calldataの長さ = 0の場合の処理
-calldataの長さ = 0(外部呼び出しがない、つまり単純送金を意味しています)の場合にcallを実行します。
+### Processing when calldata length = 0
+Execute the call when the length of calldata = 0 (no external call, which means simple remittance).
 
 ```
 3d 3d 3d 3d 34 86 5a f1 60 31 56
@@ -232,23 +233,23 @@ calldataの長さ = 0(外部呼び出しがない、つまり単純送金を意�
 
 - POS 1A〜21
 
-CALLを実行する際には、いくつかの引数を指定する必要があります。{RES}はCALLが成功したかをブール値で返します。
+When executing CALL, you need to specify some arguments. {RES} returns a Boolean value indicating whether the CALL was successful.
 
 ```
 call(g, a, v, in, insize, out, outsize)
 ```
 
-g: 送金する際に使用するガス
-a: 送金先のアドレス
-v: 送金するetherの量(単位はwei)
-in: callするデータが保持されるメモリの位置
-insize: データのサイズ
-out: 戻り値のデータを保持するメモリの位置
-outsize: データサイズ
+g: Gas used for remittance
+a: Remittance destination address
+v: Amount of ether to send (unit is wei)
+in: Memory location where the data to call is held
+insize: data size
+out: Memory location to hold the return data
+outsize: data size
 
 - POS 22〜24
 
-必ずPOS 31にジャンプします。
+Be sure to jump to POS 31.
 
 | POS | OPCODE | OPECODE TEXT | STACK |
 | --- | --- | --- | --- |
@@ -263,8 +264,8 @@ outsize: データサイズ
 | 22 | 6031 | PUSH1 0x31 | 0x31{RES} 0x0  {ADDR} |
 | 24 | 56 | JUMP | {RES} 0x0  {ADDR} |
 
-### calldataの長さ != 0 の場合の処理
-calldataの長さ != 0の場合にdelegatecallを実行します。
+### Processing when calldata length! = 0
+Execute a delegate call when the calldata length! = 0.
 
 ```
 5b 36 3d 3d 37 3d 3d 36 3d 85 5a f4
@@ -272,7 +273,7 @@ calldataの長さ != 0の場合にdelegatecallを実行します。
 
 - POS 25〜30
 
-DELEGATECALLは基本的に引数などCALLと同じですが、呼び出し元とcalldataは保持します。
+DELEGATECALL is basically the same as CALL in terms of arguments, but it retains the caller and calldata.
 
 ```
 delegatecall(g, a, in, insize, out, outsize)
@@ -293,21 +294,21 @@ delegatecall(g, a, in, insize, out, outsize)
 | 2F | 5a | GAS | GAS {ADDR} 0x0 CDS 0x0 0x0 0x0 {ADDR} |
 | 30 | f4 | DELEGATECALL | {RES} 0x0  {ADDR} |
 
-### CALLもしくはDELEGATECALLが成功か失敗した場合の分岐
-この部分では前記でCALLもしくはDELEGATECALLを実行した結果に応じた処理を行っています。
+### Branch if CALL or DELEGATE CALL succeeds or fails
+In this part, processing is performed according to the result of executing CALL or DELEGATE CALL above.
 
 ```
 5b3d82803e603c573d81fd5b3d81f3
 ```
 
-- POS 31〜38
-RES(実行した結果)が0(失敗)の場合はそのままPOS 39以降の処理を行い、RESが1(成功)の場合はPOS 3Cにジャンプします。
+- POS 31-38
+If RES (result of execution) is 0 (failure), the processing after POS 39 is performed as it is, and if RES is 1 (success), it jumps to POS 3C.
 
-- POS 39〜3B
-状態を元に戻し(リバートして)0x0からRDSまでのデータを返します。
+- POS 39 ~ 3B
+Restores (reverts) the state and returns data from 0x0 to RDS.
 
-- POS 3C〜3F
-0x0からRDSまでのデータを返します。
+- POS 3C ~ 3F
+Returns data from 0x0 to RDS.
 
 | POS | OPCODE | OPECODE TEXT | STACK |
 | --- | --- | --- | --- |
@@ -327,65 +328,66 @@ RES(実行した結果)が0(失敗)の場合はそのままPOS 39以降の処理
 | 3F | f3 | RETURN | 0x0  {ADDR} |
 
 
-## ExchangeDeposit Contract
+## Payment confirmation of ExchangeDepositContract
 
-### ライブラリのインポート
-スマートコントラクトのライブラリであるOpenZeppelinを使用します。OpenZeppelinはコントラクトでよく使われる処理をセキュアに行う目的で使用します。
+### Import library
+Use OpenZeppelin, a library of smart contracts. OpenZeppelin is used to secure the processing commonly used in contracts.
 
 ```javascript
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
 import '@openzeppelin/contracts/utils/Address.sol';
 ```
-ライブラリを使用する際は`using...for...`の様な書き方をします。SafeERC20はERC20インターフェースの基本実装で、例えばsafeTransfer関数はERC20のトークンを安全に転送することができます。IERC20はERC20を実装する際に準拠する必要があるインターフェイスです。Addressはaddressタイプに関連する関数を扱うもので、例えばisContract関数はコントラクトアカウントかどうかをbooleanで返します。
+
+When using the library, write something like `using ... for ...`. SafeERC20 is a basic implementation of the ERC20 interface, for example the safeTransfer function can securely transfer ERC20 tokens. IERC20 is an interface that must be compliant when implementing ERC20. Address deals with functions related to the address type, for example the isContract function returns whether it is a contract account or not as a boolean.
 
 ```javascript
 using SafeERC20 for IERC20;
 using Address for address payable;
 ```
 
-### 変数
-コールドウォレットのアドレスになります。`payable`修飾子をつけることで、このコントラクトアドレスに対して送金することが出来る様になります。
+### Variables
+It will be the address of the cold wallet. By adding the `payable` qualifier, you will be able to send money to this contract address.
 
  ```javascript
  address payable public coldAddress;
  ```
 
- ユーザーが入金する際の最低入金金額です。1ETH=1e18(10の18乗)なので1e16は0.01ETHと言う意味です。
+This is the minimum deposit amount for the user to deposit. Since 1ETH = 1e18 (10 to the 18th power), 1e16 means 0.01ETH.
 
  ```javascript
  uint256 public minimumInput = 1e16;
  ```
 
-プロキシコントラクトがDELEGATECALLで呼び出す、ロジックコントラクトのアドレスです。
+The address of the logic contract that the proxy contract calls with DELEGATE CALL.
 
 ```javascript
 address payable public implementation;
 ```
 
-ExchangeDepositコントラクトをコントロールする権限を持ったアドレスで、コントラクトの強制停止、ロジックの転送の無効化、コールドアドレスやimplementationアドレスの変更などをすることが可能です。
-`immutable`キーワードは読み取り専用の値で、ストレージではなくコントラクト本体に直接値を格納するものになります。
+With an address that has the authority to control the ExchangeDeposit contract, it is possible to forcibly stop the contract, disable logic transfer, change the cold address and implementation address, and so on.
+The `immutable` keyword is a read-only value that stores the value directly in the contract body rather than in storage.
 
 ```javascript
 address payable public immutable adminAddress;
 ```
 
-ExchangeDeposit Contractのインスタンスアドレスです。このアドレスがプロキシアドレスかExchangeDepositアドレスかを識別するために使用します。
+The instance address of the Exchange Deposit Contract. It is used to identify whether this address is a proxy address or an Exchange Deposit address.
 
 ```javascript
 address payable private immutable thisAddress;
 ```
 
-### コンストラクタ
+### Constructor
 
-coldAddrとadminAddrが0アドレスでないか (無効なアドレスでないか)チェックしています。
+Checking if coldAddr and adminAddr are not 0 addresses (invalid addresses).
 
 ```javascript
 require(coldAddr != address(0), '0x0 is an invalid address');
 require(adminAddr != address(0), '0x0 is an invalid address');
 ```
 
-thisAddressには、このコントラクトのアドレスを設定しています。
+The address of this contract is set in thisAddress.
 
 ```javascript
 coldAddress = coldAddr;
@@ -393,17 +395,17 @@ adminAddress = adminAddr;
 thisAddress = address(this);
 ```
 
-### イベント
-イベントはトランザクションのログ記録する為に使用します。DepositイベントはForwardingコントラクトから送金された入金のログを記録します。引数には資金の送り元のアドレスと送った金額を指定します。
+### Event
+Events are used to log transactions. The Deposit event logs deposits sent from the Forwarding contract. In the argument, specify the address of the sender of the funds and the amount sent.
 
 ```javascript
 event Deposit(address indexed receiver, uint256 amount);
 ```
 
-### 修飾子
-修飾子は関数を実行する前に特定の処理を実行したい場合に指定します。この修飾子をつけた関数を実行するコントラクトが、以下の条件だった場合に実行されます。
+### Modifier
+Qualifiers are specified when you want to perform a specific operation before executing a function. The contract that executes the function with this qualifier is executed when the following conditions are met.
 
-adminAddressである場合に内部のコードを実行します。
+Executes the internal code if it is adminAddress.
 
 ```javascript
 modifier onlyAdmin {
@@ -412,7 +414,7 @@ modifier onlyAdmin {
 }
 ```
 
-強制停止によりコールドアドレスが０アドレスになっていない場合に内部のコードを実行します。
+The internal code is executed when the cold address is not 0 due to the forced stop.
 
 ```javascript
 modifier onlyAlive {
@@ -424,7 +426,7 @@ modifier onlyAlive {
 }
 ```
 
-ExchangeDepositがcallで呼び出された場合に内部のコードを実行します。
+Executes internal code when ExchangeDeposit is called with a call.
 
 ```javascript
 modifier onlyExchangeDepositor {
@@ -432,11 +434,11 @@ modifier onlyExchangeDepositor {
     _;
 }
 ```
-### 関数
+### Function
 
-**isExchangeDepositor関数**
+** isExchangeDepositor function **
 
-コードの文脈がExchangeDepositなのかProxyなのかチェックしブール値で返します。
+Checks if the code context is Exchange Deposit or Proxy and returns a Boolean value.
 
 ```javascript
 function isExchangeDepositor() internal view returns (bool) {
@@ -444,9 +446,9 @@ function isExchangeDepositor() internal view returns (bool) {
 }
 ```
 
-**getExchangeDepositor関数**
+** getExchangeDepositor function **
 
-コードの文脈がExchangeDepositの場合ExchangeDepositコントラクトのインスタンスを返し、そうでない場合はExchangeDeposit関数を使い引数にこのコントラクトのアドレスを指定しExchangeDepositコントラクトのインスタンスを返します。
+If the code context is ExchangeDeposit, it returns an instance of the ExchangeDeposit contract, otherwise it returns an instance of the ExchangeDeposit contract using the ExchangeDeposit function with the address of this contract as an argument.
 
 ```javascript
 function getExchangeDepositor() internal view returns (ExchangeDeposit) {
@@ -454,9 +456,9 @@ function getExchangeDepositor() internal view returns (ExchangeDeposit) {
 }
 ```
 
-**getImplAddress関数**
+** getImplAddress function **
 
-implementationアドレスを取得する為の関数です。コードの文脈がExchangeDepositの場合はimplementation(ロジックコントラクトのインスタンスアドレス)を返し、そうでない場合はExchangeDeposit関数でインスタンス化した後に`implementation()`でインスタンスアドレスを返します。
+This is a function to get the implementation address. If the code context is ExchangeDeposit, it returns implementation (instance address of the logic contract), otherwise it returns the instance address with `implementation ()` after instantiating with the ExchangeDeposit function.
 
 ```javascript
 function getImplAddress() internal view returns (address payable) {
@@ -467,9 +469,9 @@ function getImplAddress() internal view returns (address payable) {
 }
 ```
 
-**getSendAddress関数**
+** getSendAddress function **
 
-gatherEthやgatherErc20の関数のsendToアドレスを取得するための関数です。通常はコールドウォレットのアドレスですが、ExchangeDepositコントラクトが強制終了している場合はadminAddressになります。
+This is a function to get the sendTo address of the gatherEth and gatherErc20 functions. This is usually the address of the cold wallet, but if the ExchangeDeposit contract has been terminated, it will be the adminAddress.
 
 ```javascript
 function getSendAddress() internal view returns (address payable) {
@@ -483,9 +485,9 @@ function getSendAddress() internal view returns (address payable) {
 }
 ```
 
-**gatherErc20関数**
+** gatherErc20 function **
 
-ERC20のトークンをコールドウォレット(強制終了している場合はadminAddress)に転送します。
+Transfer the ERC20 token to the cold wallet (adminAddress if it has been killed).
 
 ```javascript
 function gatherErc20(IERC20 instance) external {
@@ -497,9 +499,9 @@ function gatherErc20(IERC20 instance) external {
 }
 ```
 
-**gatherEth関数**
+** gatherEth function **
 
-他のコントラクトがselfdestruct(※4)によってETHを付与された場合にreceive関数では対応できません。その場合にETHをコールドウォレット(強制終了している場合はadminAddress)に転送する為の関数です。
+If ETH is given by selfdestruct (* 4) to another contract, the receive function cannot handle it. In that case, it is a function to transfer ETH to the cold wallet (adminAddress if it is forcibly terminated).
 
 ```javascript
 function gatherEth() external {
@@ -626,7 +628,7 @@ address payable toAddr = getImplAddress();
 (bool success, ) = toAddr.delegatecall(msg.data);
 ```
 
-## ExchangeDepositContractの入金確認
+## Payment confirmation of ExchangeDepositContract
 最後に入金の流れを確認する為、テストネットワーク上で入金アドレスにETHとERC20のトークンを入金し、コールドアドレスに届く過程を確認してみたいと思います。
 
 ### 環境
