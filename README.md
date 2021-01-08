@@ -1,211 +1,44 @@
-## この記事について
-この記事は、bitbankのスマートコントラクトを使ったEthereumの入金検知システム([ExchangeDepositContract](https://github.com/bitbankinc/exchangeDepositContract))の解説記事になります。ボリュームが多いので、必要な箇所だけをご覧になることをおすすめします。
+## ExchangeDepositContract
+This article is a commentary on [ExchangeDepositContract](https://github.com/bitbankinc/exchangeDepositContract).
 
-- [前提知識](https://qiita.com/adrenaline0206/items/38b9970532f9b12c3055#%E5%89%8D%E6%8F%90%E7%9F%A5%E8%AD%98)
-    - コードを読む上で知っておくべき前提知識を紹介
-- [ExchangeDepositContractの概要](https://qiita.com/adrenaline0206/items/38b9970532f9b12c3055#%E5%89%8D%E6%8F%90%E7%9F%A5%E8%AD%98)
-    - Exchange Deposit Contractとは何か説明
-- [ExchangeDepositContractの説明](https://qiita.com/adrenaline0206/items/38b9970532f9b12c3055#%E5%89%8D%E6%8F%90%E7%9F%A5%E8%AD%98)
-    - Exchange Deposit Contractのコードについて説明
-- [ExchangeDepositContractの入金確認](https://qiita.com/adrenaline0206/items/38b9970532f9b12c3055#%E5%89%8D%E6%8F%90%E7%9F%A5%E8%AD%98)
-    - Exchange Deposit Contractに対して実際に入金
+- Overview of ExchangeDepositContract
+    - What is Exchange Deposit Contract
+- Details of ExchangeDepositContract
+    - Explanation about code of Exchange Deposit Contract
+- Payment confirmation of ExchangeDepositContract
+    - Actual deposit to Exchange Deposit Contract
 
-## はじめに
-[ExchangeDepositContract](https://github.com/bitbankinc/exchangeDepositContract)はbitbankがOSSとして公開している、スマートコントラクトを使ったEthereumの入金検知システムになります。ユーザーが取引所にEthereumを入金した際に、取引所でどの様に入金を検知しているのか知ることが出来ます。またスマートコントラクトを使った入金検知システムなので、ETHだけでなくERC20のトークンにも対応しています。consensysによる[audit](https://consensys.net/diligence/audits/2020/11/bitbank/)を受けておりsolidityの学習には最適のコードでした。今回、このコードから多くのことを学んだので共有したいと思います。
-
-※こちらの記事の内容と、bitbankとは無関係ですのでご了承ください
-
-## この記事の対象者
-
-- スマートコントラクトに興味がある方
-- スマートコントラクトの活用例について知りたい方
-- Solidityを学習中の方
-
-## 前提知識
-
-### アカウントの種類
-Ethereumには2種類のアカウントがあります。
-
-- 外部所有アカウント(EOA: Externally owned accounts)
-    - 秘密鍵によってコントロールされ、Ethereumの残高を所有し、ETH転送の為のトランザクションを送信することが出来ます
-- コントラクトアカウント
-    - Ethereumの残高・コントラクトコードを所有し、他のコントラクトからのトランザクションまたはメッセージによって動作します
-
-![スクリーンショット 2021-01-05 16.06.12.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/58a12ede-271e-1fab-d4bd-5310c1886a48.png)
-
-
-### fallback関数
-solidityにはfallback関数と呼ばれる関数があります。
-
-コントラクトAからコントラクトBに対して関数Dを呼び出した場合、関数Dがないのでエラーになります。
-コントラクトAからコントラクトCに対して関数Dを呼び出した場合、関数Dは存在しませんがその場合に呼ばれるのがfallback関数です。
-
-![スクリーンショット 2021-01-05 16.30.16.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/2068afc0-8531-6e45-6043-d0dba8272a34.png)
-
-
-### solidity assembly
-solidityにはコード内でアセンブリ言語を使用することが出来る、インラインアセンブリがあります。ストレージ(※2)にデータを書き込む際に、インラインアセンブリでデータサイズを意識しながら書き込むことで、ガスを節約することが可能になります。しかし多用すると可読性が低下し、バグを生み出す可能性が高まりますので使用する際には注意が必要になります。
-下記の例ではxとyの和をメモリの0x0+32byteの領域に格納し返しています。solidity assemblyの詳細に関しては[こちら](https://docs.soliditylang.org/en/v0.6.0/assembly.html)をご参照下さい。
-
-````javascript
-assembly {
-    let result := add(x, y)
-    mstore(0x0, result)
-    return(0x0, 32)
-}
-````
-※2 ブロックチェーンに永続的に格納される領域
-
-### Proxy Pattern
-コントラクトコードは本番のブロックチェーンに一度デプロイされると、後から変更することが出来ません。しかし、変更出来ないと後々困ることになります。そこでデプロイされたコードを変更するのではなく、アップデートする方法としてProxy Patternを用います。これはストレージとして使用するプロキシコントラクトとロジックを定義するロジックコントラクトを分け、プロキシコントラクトからDELEGATECALLでロジックコントラクトの呼び出し先を変える方法です。
-
-ちなみにForwarding Contractがプロキシコントラクトになります。またExchange Deposit Contractはfallback関数の実行時にプロキシコントラクトです。
-
-![スクリーンショット 2021-01-05 16.28.23.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/c172db69-3fec-bf61-6699-ec8ae95a6080.png)
-
-### Method ID
-solidityではコントラクトから他のコントラクトの関数を実行する際に、Method IDをFunction Selectorに渡して実行します。関数名と引数の型の文字列をkeccak256と言うハッシュ関数でハッシュ化し、頭の4byteを取ったものがMethod IDになります。
-
-```
-bytes4(keccak256("setNum(uint256)") = 0xcd16ecbf
-```
-
-### calldata
-EVM(Ethereum Virtual Machine)でコードを実行する際にstack、memory、storage、calldata、returndataの５つのデータ領域を使います。その中の１つcalldataはcallまたはdelegatecallで別のコントラクトを呼び出した時に使用するデータ領域です。
-
-例えばHogeコントラクトのfuga関数について、fuga関数を引数x=64、y=trueで呼び出した場合のcalldataは以下の通りです。
-
-Hogeコントラクト
-
-```javascript
-contract Hoge {
-  function fuga(uint32 x, bool y) returns (bool r) { ... }
-}
-```
-
-Method ID(4bytes)
-
-```
-0xe7fac2e0
-```
-
-x=64(32bytes)
-
-```
-0x0000000000000000000000000000000000000000000000000000000000000040
-```
-y=true(32bytes)
-
-```
-0x0000000000000000000000000000000000000000000000000000000000000001
-```
-calldataは`Method ID`と`x`と`y`を合わせた68bytesのデータになります。
-
-```
-0xe7fac2e000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000001
-```
-
-### DELEGATECALL
-Exchange Deposit Contractでは、コントラクトから別のコントラクトの関数を呼び出す際にCALLとDELEGATECALLと言う関数を使用しています。
-
-### CALLとDELEGATECALLの違い
-以下のコントラクトを用いてCALLとDELEGATECALLの違いを説明します。このコントラクトはEOAアカウントからC1コントラクトを呼び出し、C1コントラクトの２つの関数を実行します。その際にC1コントラクトからC2コントラクトのsetNum関数をcallまたはdelegatecallで呼び出しています。
-
-```javascript
-contract C1 {
-    uint256 public num;
-    address public sender;
-
-    function callSetNum(address c2, uint256 _num) public {
-        (bool success, ) =
-            c2.call(
-                abi.encodeWithSelector(
-                    bytes4(keccak256('setNum(uint256)')),
-                    _num
-                )
-            );
-        require(success);
-    }
-
-    function delegatecallSetNum(address c2, uint256 _num) public {
-        (bool success, ) =
-            c2.delegatecall(
-                abi.encodeWithSelector(
-                    bytes4(keccak256('setNum(uint256)')),
-                    _num
-                )
-            );
-        require(success);
-    }
-}
-
-contract C2 {
-    uint256 public num;
-    address public sender;
-
-    function setNum(uint256 _num) public {
-        num = _num;
-        sender = msg.sender;
-    }
-}
-```
-callでsetNum関数を呼び出した場合、senderはC1のコントラクトアドレスになります。C2が参照するストレージはC2なので、C2のnumにsetNum関数で指定した_numが入ります。
-delegatecallでsetNum関数を呼び出した場合、senderは呼び出し元のEOAアドレスになります。C2が参照するストレージはC1なので、C1のnumにsetNum関数で指定した_numが入ります。
-
-注目して頂きたいのは、setNum関数のロジックはC2コントラクトにありますが、delegatecallを使うことで呼び出し元(EOA)から見た場合に、あたかもC1コントラクトで全ての処理行っているかのように動作します。
-
-| 呼び出し方 | コンテキスト | num | sender | 
-| --- | --- | --- | --- |
-| call | C2 | C2のnumにcallSetNum関数の引数で指定した_numが入る | C1のコントラクトアドレス |
-| delegatecall | C1 | C1のnumにdelegatecallSetNum関数の引数で指定した_numが入る | 呼び出し元のEOAアドレス |
-
-### DELEGATECALLの使用例
-例えばテスト用フォルダにあるSample Logic Contractで定義されているgatherHalfErc20を呼び出す際についてです。この場合UserからgatherHalfErc20を呼び出しており、`calldata != null`なのでDELEGATECALLでExchange Deposit Contractに対してgatherHalfErc20を呼びます。Exchange Deposit ContractにはgatherHalfErc20がないのでfallback関数が実行されます。fallback関数の中にはSample Logic Contractに対してDELEGATECALLでgatherHalfErc20を呼び出すロジックが定義されています。
-
-![スクリーンショット 2021-01-05 15.56.12.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/dcf48b7b-e07e-8cbb-e72c-7c1f24485830.png)
-
-
-なぜForwarding Contractにこの様なロジックを定義しないかと言うと、Forwarding Contractはユーザー毎にデプロイされるのでその都度、ロジックの分のガスコストがかかります。そこで上記ではForwarding ContractとExchange Deposit ContractをプロキシとしてdelegatecallでSample Logic Contractから呼び出します。すると、ユーザーから見た場合にあたかもForwarding Contractで全ても処理をしている様に振る舞い、かつExchange Deposit Contractは１度しかデプロイされないので、デプロイコストを下げることが出来きます。
-
-### ERC20
-Ethereum上でトークンを発行する際に、トークンの作成や操作を簡単にする為の規格としてERC20の仕様がEIP20に規定されています。トークンのコントラクトにはトークンの保有者(address)と保有量(amount)が連想配列で記録されており、この記録を管理する３つのプロパティと２つのイベント、６つの関数からなります。ERC20の詳細については[こちら](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md)をご覧ください。
-
-![スクリーンショット 2021-01-04 21.43.20.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/4e68f7d9-e402-67d1-e80d-21edf82eb0df.png)
-
-
-以上が簡単ではありますが、知っておくべき前提知識でした。
-
-## ExchangeDepositContractの概要
-### ExchangeDepositContractの構成
-Exchange Deposit Contractは４つのコントラクトで構成されています。
-Forwarding ContractはProxy Factory Contractから作成されます。Forwarding Contractのコントラクトアドレスがユーザーの入金先のアドレスです。この入金アドレスは各ユーザー毎に付与され、ユーザーがこのアドレスにETHやERC20のトークンを入金することになります。Exchange Deposit Contractは各コントラクトを仲介する役割があり、このコントラクト通して最終的にCold Walletへ送金されます。その際にイベントが発火して入金のイベント履歴が残るので、その記録を元に入金検知を行います。Extra Implementation Contractはロジックを拡張する際に使用します。
+## Overview of ExchangeDepositContract
+### ExchangeDepositContract configuration
+The Exchange Deposit Contract consists of four contracts.
+Forwarding Contracts are created from Proxy Factory Contracts. The contract address of the Forwarding Contract is the address to which the user deposits. This deposit address is given to each user, and the user will deposit ETH or ERC20 tokens to this address. The Exchange Deposit Contract acts as an intermediary for each contract, and the money is finally transferred to the Cold Wallet through this contract. At that time, the event fires and the event history of deposit remains, so deposit detection is performed based on that record. Extra Implementation Contract is used to extend the logic.
 
 ![スクリーンショット 2020-12-31 17.00.07.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/07baf480-c53a-b1a1-7016-c4d3e8fdeac4.png)
 
-### 入金の流れ
-ETHとERC20の入金先は同じコントラクトアドレスですが、入金した後の流れが異なります。ここでは大まかに入金の流れを確認します。
+### Deposit flow
+The deposit destination of ETH and ERC20 is the same contract address, but the flow after deposit is different. Here, we will roughly check the flow of deposit.
 
-①ETHの場合
+①ETH
 
-- UserのEAOアドレスからForwarding Contractのコントラクトアドレスへ入金を行う際、外部呼び出しがないのでcalldataはnullになります
+- When depositing from User's EAO address to Forwarding Contract's contract address, calldata will be null because there is no external call
 
-- Forwarding Contractはcalldataがnullの場合、入金されたETHをcallでExchange Deposit Contractのコントラクトアドレスに送金します
+- Forwarding Contract will send the deposited ETH to the contract address of Exchange Deposit Contract by call if call data is null.
 
-- Exchange Deposit Contractは入金されたETHをcallでCold Walletに送金します。その際にemitでDepositイベントを発火します。このデータとユーザー情報を照合することで入金検知をします。
+- The Exchange Deposit Contract sends the deposited ETH to the Cold Wallet with a call. At that time, emit fires a Deposit event. Payment is detected by collating this data with user information.
 
 ![スクリーンショット 2021-01-03 14.39.29.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/a31af04d-4929-c0a4-a7ce-26e5ecfe30e1.png)
 
-②ERC20トークンの場合
+②ERC20 token
 
-- UserのコントラクトアドレスからForwarding ContractのコントラクトアドレスへERC20トークンの入金する為に、UserのコントラクトアドレスからERC20のtransferを呼び出します。ERC20のコントラクトの残高情報が更新されます。
+- Call ERC20 transfer from User's contract address to deposit ERC20 tokens from User's contract address to Forwarding Contract's contract address. The balance information of the ERC20 contract will be updated.
 
-- ERC20のtransferイベント履歴を調べてForwarding Contractのコントラクトアドレスがあれば入金があったことが分かります。
+- Check the transfer event history of ERC20 and if you have the contract address of Forwarding Contract, you can see that there was a deposit.
 
-- Forwarding Contractに入金されたERC20をCold Walletに送金する為に、admin(adminでなくても実行可能)からForwarding Contractに対してgatherErc20を呼び出します
+- From admin (which can be executed even if you are not admin) to call gatherErc20 to Forwarding Contract to send ERC20 deposited in Forwarding Contract to Cold Wallet
 
-- Forwarding ContractはExchange Deposit ContractのgatherErc20をdelegatecallで呼び出します
+- Forwarding Contract calls gatherErc20 of Exchange Deposit Contract with delegate call
 
-- Forwarding ContractからERC20のtransferを呼び出すことで、ERC20のコントラクトの残高情報を更新されます
+- By calling ERC20 transfer from Forwarding Contract, the balance information of ERC20 contract will be updated
 
 ![スクリーンショット 2021-01-03 14.48.24.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/03be5727-eccf-756a-c37a-981e32a81985.png)
 
@@ -912,10 +745,6 @@ TransferAccountから入金用のアドレスにトークンを送金します�
 Transfer Addressからユーザーの入金用アドレスに送金した金額がコールドアドレスに届いているのが確認出来ました。
 
 ![スクリーンショット 2021-01-04 23.02.43.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/e0e79a3f-e658-65bd-e739-6c3d13936fc1.png)
-
-## おわりに
-最後まで記事を読んで頂き、ありがとうございました。
-こちらの記事は、先日会社のブログで書かせて頂いた内容を再編集したものになります。どうしても自分の納得のいく形で完成させたかったので、この場をお借りして記事を書かせて頂きました。まだまだ駆け出しのエンジニアですので、間違えて理解している部分もあるかと思います。その場合は是非ご指摘頂ければ幸いです。
 
 ## 参考文献
 - [Ethereum Whitepaper](https://ethereum.org/en/whitepaper/)
