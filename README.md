@@ -113,7 +113,7 @@ The bytecode below.
 0x604080600a3d393df3fe7300000000000000000000000000000000000000003d366025573d3d3d3d34865af16031565b363d3d373d3d363d855af45b3d82803e603c573d81fd5b3d81f3
 ```
 
-I am writing bytecode to memory with `bytes memory`. `initCodeMem` contains the byte length of` INIT_CODE`.
+It is writing bytecode to memory with `bytes memory`. `initCodeMem` contains the byte length of` INIT_CODE`.
 
 ```
 bytes memory initCodeMem = INIT_CODE;
