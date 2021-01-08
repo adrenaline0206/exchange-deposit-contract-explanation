@@ -175,7 +175,7 @@ The following bytecode defined in deployNewInstance of Proxy Factory Contract is
 60 40 80 60 0a 3d 39 3d f3 fe 73 AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA AA 3d 36 60 25 57 3d 3d 3d 3d 34 86 5a f1 60 31 56 5b 36 3d 3d 37 3d 3d 36 3d 85 5a f4 5b 3d 82 80 3e 60 3c 57 3d 81 fd 5b 3d 81 f3
 ```
 
-I would like to explain what the Forwarding Contract is doing. At that time, a diagram showing the status of POS (position), OPCODE (opcode), OPCODE TEXT (content of opcode), and STACK (stack) is used (* 3).
+It would be like to explain what the Forwarding Contract is doing. At that time, a diagram showing the status of POS (position), OPCODE (opcode), OPCODE TEXT (content of opcode), and STACK (stack) is used (* 3).
 
 ※3 Please refer to [Ethereum Virtual Machine Opcodes] (https://ethervm.io/) for OPCODE.
 
