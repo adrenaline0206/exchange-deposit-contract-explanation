@@ -11,7 +11,7 @@ This article is a commentary on [ExchangeDepositContract](https://github.com/bit
 ## Overview of ExchangeDepositContract
 ### ExchangeDepositContract configuration
 The Exchange Deposit Contract consists of four contracts.
-Forwarding Contracts are created from Proxy Factory Contracts. The contract address of the Forwarding Contract is the address to which the user deposits. This deposit address is given to each user, and the user will deposit ETH or ERC20 tokens to this address. The Exchange Deposit Contract acts as an intermediary for each contract, and the money is finally transferred to the Cold Wallet through this contract. At that time, the event fires and the event history of deposit remains, so deposit detection is performed based on that record. Extra Implementation Contract is used to extend the logic.
+Forwarding Contracts are created from Proxy Factory Contracts. The contract address of the Forwarding Contract is the address to which the user deposits. This deposit address is given to each user, and the user will deposit ETH or ERC20 tokens to this address. The Exchange Deposit Contract acts as an intermediary for each contract, and the found  is finally transferred to the Cold Wallet through this contract. At that time, the event fires and the event history of deposit remains, so deposit detection is performed based on that record. Extra Implementation Contract is used to extend the logic.
 
 ![スクリーンショット 2020-12-31 17.00.07.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/07baf480-c53a-b1a1-7016-c4d3e8fdeac4.png)
 
@@ -753,3 +753,4 @@ I was able to confirm that the amount sent from the Transfer Address to the user
 - [Ethereum yellow paper](https://ethereum.github.io/yellowpaper/paper.pdf) 
 - [Ethereum Virtual Machine Opcodes](https://ethervm.io/)
 - [Solidity Document](https://solidity.readthedocs.io/en/v0.6.11/)
+
