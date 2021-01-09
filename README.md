@@ -1,5 +1,5 @@
 ## ExchangeDepositContract
-This article is a commentary on [ExchangeDepositContract](https://github.com/bitbankinc/exchangeDepositContract).
+This article is a commentary on [ExchangeDepositContract](https://github.com/bitbankinc/exchangeDepositContract)(bitbank Ethereum deposit detection system.).
 
 - Overview of ExchangeDepositContract
     - What is Exchange Deposit Contract
