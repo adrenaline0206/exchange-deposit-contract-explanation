@@ -210,7 +210,7 @@ The OPCODE `fe` stands for` INVALID` and means the boundary between the deploy c
 | 08 | f3 | RETURN | |
 | 09 | fe | INVALID |  |
 
-### Forwarding Contractの実行コード
+### Expiration date of transfer contract
 In this part, branching is performed depending on whether the length of call data is 0.
 
 ```
