@@ -47,18 +47,23 @@ The deposit destination of ETH and ERC20 is the same contract address, but the f
 [Exchange Deposit Contract](https://github.com/bitbankinc/exchangeDepositContract) has 5 solidity files. ① and ② are directly related to the deposit detection system, and ③ to ⑤ are test contracts.
 
 ①ExchangeDeposit
+
 It will be the main contract. This contract is deployed only once at the beginning.
 
 ②ProxyFactory
+
 It is a contract that creates a Forwarding Contract for each user. The user makes a deposit to the Forwarding Contract contract address.
 
 ③【Test】SimpleCoin
+
 It is a contract that imitates ERC20. This contract is used when testing ERC20.
 
 ④【Test】SimpleBadCoin
+
 It is a contract that imitates ERC20. Used when testing bad cases of SimpleCoin.
 
 ⑤【Test】SampleLogic
+
 It is a contract that simulates how it works when a new logic contract is specified from a proxy contract. Used when testing.
 
 
@@ -753,4 +758,3 @@ I was able to confirm that the amount sent from the Transfer Address to the user
 - [Ethereum yellow paper](https://ethereum.github.io/yellowpaper/paper.pdf) 
 - [Ethereum Virtual Machine Opcodes](https://ethervm.io/)
 - [Solidity Document](https://solidity.readthedocs.io/en/v0.6.11/)
-
