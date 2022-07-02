@@ -709,6 +709,8 @@ It was confirmed that the amount of 0.5 ETH sent from the user's account (Transf
 
 ![スクリーンショット 2021-01-04 8.52.34.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/268135/9d4b5db0-21c2-4212-04b7-12b6a2cfc20b.png)
 
+※You can use [this app](https://github.com/adrenaline0206/exchange-deposit-contract-experience) to further deepen your understanding of Exchange Deposit Contract.
+
 ### Deposit ERC20 Token
 
 Then, make a deposit using MetaMask and Remix. The procedure up to the above `ETH deposit` step ⑦ is the same.
